@@ -52,6 +52,9 @@ add_action( 'init', 'pmproeewe_test' );
  */
 function pmproeewe_extra_emails() {
 	global $wpdb;
+    global $pmproeewe_log_count;
+
+    $pmproeewe_log_count = 0;
 
 	// New in v3.5: Unhook the PMPro_Scheduled_Actions class expiration reminder function.
 	if ( class_exists( 'PMPro_Recurring_Actions' ) ) {
@@ -168,6 +171,8 @@ function pmproeewe_extra_emails() {
 		pmproeewe_log( "SQL used: {$sqlQuery}" );
 
 		$expiring_soon = $wpdb->get_results( $sqlQuery );
+
+        $pmproeewe_log_count += $wpdb->num_rows;
 		pmproeewe_log( "Found {$wpdb->num_rows} records to process for expiration warnings that are {$days} days out" );
 
 		foreach ( $expiring_soon as $e ) {
@@ -334,6 +339,11 @@ function pmproeewe_log( $message ) {
  */
 function pmproeewe_output_log() {
 	global $pmproewee_logstr;
+    global $pmproeewe_log_count;
+
+    if ( 0 === $pmproeewe_log_count && ! pmproeewe_is_test() ) {
+        return; // Nothing to log.
+    }
 
 	$pmproewee_logstr = 'Logged On: ' . date_i18n( 'm/d/Y H:i:s' ) . "\n" . $pmproewee_logstr . "\n-------------\n";
 
