@@ -16,7 +16,7 @@ define( 'PMPROEEWE_DIR', plugin_dir_path( __FILE__ ) );
  * Load the languages folder for translations.
  */
 function pmproeewe_load_plugin_text_domain() {
-	load_plugin_textdomain( 'pmpro-extra-expiration-warning-emails', false, basename( dirname( __FILE__ ) ) . '/languages' );
+	load_plugin_textdomain( 'pmpro-extra-expiration-warning-emails', false, basename( __DIR__ ) . '/languages' );
 }
 add_action( 'plugins_loaded', 'pmproeewe_load_plugin_text_domain' );
 
@@ -27,14 +27,14 @@ add_action( 'plugins_loaded', 'pmproeewe_load_plugin_text_domain' );
  */
 function pmproeewe_test() {
 	global $wpdb;
-	
+
 	if ( pmproeewe_is_test() ) {
-		pmproeewe_log( "TEST: Running expiration functionality" );
+		pmproeewe_log( 'TEST: Running expiration functionality' );
 		pmproeewe_extra_emails();
-		pmproeewe_log( "TEST: Running the expiration functionality again (expecting no records found)" );
+		pmproeewe_log( 'TEST: Running the expiration functionality again (expecting no records found)' );
 		pmproeewe_extra_emails();
-		pmproeewe_log( "TEST: Cleaning up after the test" );
-		
+		pmproeewe_log( 'TEST: Cleaning up after the test' );
+
 		// Clean up after the test.
 		$wpdb->query( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE 'pmproewee_expiration_test_notice_%'" );
 
@@ -60,12 +60,11 @@ function pmproeewe_extra_emails() {
 		// Fallback for older versions of PMPro.
 		remove_action( 'pmpro_cron_expiration_warnings', 'pmpro_cron_expiration_warnings' );
 		// Clean up errors in the memberships_users table that could cause problems.
-		if( function_exists( 'pmpro_cleanup_memberships_users_table' ) ) {
+		if ( function_exists( 'pmpro_cleanup_memberships_users_table' ) ) {
 			pmpro_cleanup_memberships_users_table();
 		}
 	}
 
-	
 	/**
 	 * DO NOT edit this add-on!
 	 *
@@ -88,15 +87,17 @@ function pmproeewe_extra_emails() {
 	 *
 	 * @param array $emails An array of days and template files to use for the emails.
 	 */
-	$emails = apply_filters( 'pmproeewe_email_frequency_and_templates', array(
+	$emails = apply_filters(
+		'pmproeewe_email_frequency_and_templates',
+		array(
 			30 => 'membership_expiring',
 			60 => 'membership_expiring',
 			90 => 'membership_expiring',
 		)
-	);        //<--- !!! UPDATE THIS ARRAY TO CHANGE WHEN EMAILS GO OUT AND THEIR TEMPLATE FILES !!! -->
+	);        // <--- !!! UPDATE THIS ARRAY TO CHANGE WHEN EMAILS GO OUT AND THEIR TEMPLATE FILES !!! -->
 	ksort( $emails, SORT_NUMERIC );
-	pmproeewe_log( "Template array: " . print_r( $emails, true ) );
-	
+	pmproeewe_log( 'Template array: ' . print_r( $emails, true ) );
+
 	/**
 	 * Allow the admin to be Bcc'd on all emails sent by this add-on.
 	 *
@@ -112,24 +113,24 @@ function pmproeewe_extra_emails() {
 	// Use a dummy meta value for tests.
 	$meta = pmproeewe_is_test() ? 'pmproewee_expiration_test_notice_' : 'pmproewee_expiration_notice_';
 
-    // If multisite, we need to adjust the meta key to avoid conflicts.
-    if ( is_multisite() ) {
-        $site_meta =  $meta . get_current_blog_id() . '_';
-    } else {
-        $site_meta = $meta;
-    }
+	// If multisite, we need to adjust the meta key to avoid conflicts.
+	if ( is_multisite() ) {
+		$site_meta = $meta . get_current_blog_id() . '_';
+	} else {
+		$site_meta = $meta;
+	}
 
 	// Get the current date/time.
-	$today = date_i18n( "Y-m-d H:i:s", current_time( 'timestamp' ) );
+	$today = date_i18n( 'Y-m-d H:i:s', current_time( 'timestamp' ) );
 	// Allow test environment to set the value of 'today'.
 	if ( pmproeewe_is_test() && isset( $_REQUEST['pmproeewe_test_date'] ) ) {
 		$today = sanitize_text_field( $_REQUEST['pmproeewe_test_date'] ) . ' 00:00:00';
 	}
-	
+
 	// The previous $days value that we sent emails for.
 	$last = 0;
-	
-	foreach ( $emails as $days => $email_template ) {	
+
+	foreach ( $emails as $days => $email_template ) {
 		// If we don't have a template, use the default PMPro one.
 		$email_template = empty( $email_template ) ? 'membership_expiring' : $email_template;
 
@@ -155,26 +156,26 @@ function pmproeewe_extra_emails() {
             GROUP BY mu.user_id, mu.membership_id, mu.startdate, mu.enddate
 			ORDER BY mu.enddate",
 			$meta,
-            $site_meta,
+			$site_meta,
 			$days,
 			date_i18n( 'Y-m-d H:i:s', strtotime( "{$today} +{$last} days", current_time( 'timestamp' ) ) ), // Start date to being looking for expiring memberhsips.
 			date_i18n( 'Y-m-d H:i:s', strtotime( "{$today} +{$days} days", current_time( 'timestamp' ) ) ) // End date to stop looking for expiring memberships.
 		);
 		// Allow setting a limit on the number of records to process.
 		if ( defined( 'PMPRO_CRON_LIMIT' ) ) {
-			$sqlQuery .= " LIMIT " . PMPRO_CRON_LIMIT;
+			$sqlQuery .= ' LIMIT ' . PMPRO_CRON_LIMIT;
 		}
 		pmproeewe_log( "SQL used: {$sqlQuery}" );
-		
+
 		$expiring_soon = $wpdb->get_results( $sqlQuery );
 		pmproeewe_log( "Found {$wpdb->num_rows} records to process for expiration warnings that are {$days} days out" );
-		
+
 		foreach ( $expiring_soon as $e ) {
 			// Make sure that we have a user.
 			$euser = get_userdata( $e->user_id );
 			if ( ! empty( $euser ) ) {
 				$euser->membership_level = pmpro_getSpecificMembershipLevelForUser( $euser->ID, $e->membership_id );
-				
+
 				// Only actually send the message if we're not testing.
 				if ( apply_filters( 'pmproeewe_send_reminder_to_user', true, $euser ) ) {
 					if ( ! pmproeewe_is_test() ) {
@@ -184,23 +185,23 @@ function pmproeewe_extra_emails() {
 							$pmproemail->sendMembershipExpiringEmail( $euser, $e->membership_id );
 						} else {
 							// Send the custom template email.
-							$pmproemail = new PMProEmail();
-							$pmproemail->email   = $euser->user_email;
-							$pmproemail->subject = sprintf( __( 'Your membership at %s will end soon', 'pmpro-extra-expiration-warning-emails' ), get_option( 'blogname' ) );
+							$pmproemail           = new PMProEmail();
+							$pmproemail->email    = $euser->user_email;
+							$pmproemail->subject  = sprintf( __( 'Your membership at %s will end soon', 'pmpro-extra-expiration-warning-emails' ), get_option( 'blogname' ) );
 							$pmproemail->template = $email_template;
-							$pmproemail->data = array(
-								"subject"               => $pmproemail->subject,
-								"name"                  => $euser->display_name,
-								"user_login"            => $euser->user_login,
-								"sitename"              => get_option( "blogname" ),
-								"membership_id"         => $euser->membership_level->id,
-								"membership_level_name" => $euser->membership_level->name,
-								"siteemail"             => get_option( 'pmpro_from_email' ),
-								"login_link"            => wp_login_url(),
-								"enddate"               => date_i18n( get_option( 'date_format' ), $euser->membership_level->enddate ),
-								"display_name"          => $euser->display_name,
-								"user_email"            => $euser->user_email,
-								"renew_url"             =>  ( ! empty( $euser->membership_level ) && ! empty( $euser->membership_level->id ) ) ? pmpro_url( 'checkout', '?pmpro_level=' . $euser->membership_level->id ) : pmpro_url( 'levels' ),
+							$pmproemail->data     = array(
+								'subject'               => $pmproemail->subject,
+								'name'                  => $euser->display_name,
+								'user_login'            => $euser->user_login,
+								'sitename'              => get_option( 'blogname' ),
+								'membership_id'         => $euser->membership_level->id,
+								'membership_level_name' => $euser->membership_level->name,
+								'siteemail'             => get_option( 'pmpro_from_email' ),
+								'login_link'            => wp_login_url(),
+								'enddate'               => date_i18n( get_option( 'date_format' ), $euser->membership_level->enddate ),
+								'display_name'          => $euser->display_name,
+								'user_email'            => $euser->user_email,
+								'renew_url'             => ( ! empty( $euser->membership_level ) && ! empty( $euser->membership_level->id ) ) ? pmpro_url( 'checkout', '?pmpro_level=' . $euser->membership_level->id ) : pmpro_url( 'levels' ),
 							);
 							$pmproemail->sendEmail();
 						}
@@ -208,29 +209,29 @@ function pmproeewe_extra_emails() {
 						$test_exp_days = round( ( ( $euser->membership_level->enddate - current_time( 'timestamp' ) ) / DAY_IN_SECONDS ), 0 );
 						pmproeewe_log( "Test mode and processing warnings for day {$days} (user's membership expires in {$test_exp_days} days): Faking email using template {$email_template} to user ID {$e->user_id}." );
 					}
-					pmproeewe_log( sprintf("Membership expiring email sent to user ID %d. ",  $e->user_id ) );
+					pmproeewe_log( sprintf( 'Membership expiring email sent to user ID %d. ', $e->user_id ) );
 				}
 
-                // Update user meta to track that we sent notice.
-                $full_meta = $site_meta . $e->membership_id;
-                if ( false == update_user_meta( $e->user_id, $full_meta, $today ) ) {
-                    pmproeewe_log( "Error: Unable to update {$full_meta} key for {$e->user_id}!" );
-                } else {
-                    pmproeewe_log( "Saved {$full_meta} = {$today} for {$e->user_id}: enddate = " . date_i18n( 'Y-m-d H:i:s', $euser->membership_level->enddate ) );
-                }
+				// Update user meta to track that we sent notice.
+				$full_meta = $site_meta . $e->membership_id;
+				if ( false == update_user_meta( $e->user_id, $full_meta, $today ) ) {
+					pmproeewe_log( "Error: Unable to update {$full_meta} key for {$e->user_id}!" );
+				} else {
+					pmproeewe_log( "Saved {$full_meta} = {$today} for {$e->user_id}: enddate = " . date_i18n( 'Y-m-d H:i:s', $euser->membership_level->enddate ) );
+				}
 
-                if ( $meta !== $site_meta ) {
-                    // Remove the non-multisite meta key for backward compatibility.
-                    $full_meta_compat = $meta . $e->membership_id;
-                    delete_user_meta( $e->user_id, $full_meta_compat ); // Remove old key.
-                }
+				if ( $meta !== $site_meta ) {
+					// Remove the non-multisite meta key for backward compatibility.
+					$full_meta_compat = $meta . $e->membership_id;
+					delete_user_meta( $e->user_id, $full_meta_compat ); // Remove old key.
+				}
 			}
 		}
-		
+
 		// To track intervals.
 		$last = $days;
 	}
-	
+
 	// remove the filter for admin
 	if ( $bcc_admin ) {
 		remove_filter( 'pmpro_email_headers', 'pmproeewe_add_admin_as_bcc' );
@@ -303,13 +304,13 @@ function pmproeewe_add_admin_as_bcc( $headers ) {
 	$a_email = get_option( 'admin_email' );
 	$admin   = get_user_by( 'email', $a_email );
 
-    // Handle cases with the admin_email is not associated with a user.
-    if ( $admin && isset( $admin->first_name, $admin->last_name, $admin->user_email ) ) {
+	// Handle cases with the admin_email is not associated with a user.
+	if ( $admin && isset( $admin->first_name, $admin->last_name, $admin->user_email ) ) {
 		$headers[] = "Bcc: {$admin->first_name} {$admin->last_name} <{$admin->user_email}>";
 	} elseif ( $a_email && is_email( $a_email ) ) {
 		$headers[] = "Bcc: {$a_email}";
 	}
-	
+
 	return $headers;
 }
 
@@ -334,19 +335,22 @@ function pmproeewe_log( $message ) {
 function pmproeewe_output_log() {
 	global $pmproewee_logstr;
 
-	$pmproewee_logstr = "Logged On: " . date_i18n("m/d/Y H:i:s") . "\n" . $pmproewee_logstr . "\n-------------\n";
+	$pmproewee_logstr = 'Logged On: ' . date_i18n( 'm/d/Y H:i:s' ) . "\n" . $pmproewee_logstr . "\n-------------\n";
 
-	//log in file or email?
+	// log in file or email?
 	if ( defined( 'PMPROEEWE_DEBUG' ) && PMPROEEWE_DEBUG === 'log' ) {
 		// Output to log file.
-		$logfile = apply_filters( 'pmproeewe_logfile', PMPROEEWE_DIR . '/logs/pmproeewe.txt' );
-		$loghandle = fopen( $logfile, "a+" );
+		$logfile   = apply_filters( 'pmproeewe_logfile', PMPROEEWE_DIR . '/logs/pmproeewe.txt' );
+		$loghandle = fopen( $logfile, 'a+' );
 		fwrite( $loghandle, $pmproewee_logstr );
 		fclose( $loghandle );
 	} elseif ( defined( 'PMPROEEWE_DEBUG' ) && false !== PMPROEEWE_DEBUG ) {
 		// Send via email.
-		$log_email = strpos( PMPROEEWE_DEBUG, '@' ) ? PMPROEEWE_DEBUG : get_option( 'admin_email' );
-		wp_mail( $log_email, get_option( 'blogname' ) . ' PMPro EEWE Debug Log', nl2br( esc_html( $pmproewee_logstr ) ) );
+		$log_email  = strpos( PMPROEEWE_DEBUG, '@' ) ? PMPROEEWE_DEBUG : get_option( 'admin_email' );
+		$from_email = get_option( 'pmpro_from_email' ) ?: get_option( 'admin_email' );
+		$from_name  = get_option( 'pmpro_from_name' ) ?: get_option( 'blogname' );
+		$headers    = array( 'Content-Type: text/html; charset=UTF-8', 'From: ' . $from_name . ' <' . $from_email . '>' );
+		wp_mail( $log_email, get_option( 'blogname' ) . ' PMPro EEWE Debug Log', nl2br( esc_html( $pmproewee_logstr ) ), $headers );
 	}
 }
 
@@ -363,7 +367,7 @@ function pmproeewe_plugin_row_meta( $links, $file ) {
 		);
 		$links     = array_merge( $links, $new_links );
 	}
-	
+
 	return $links;
 }
 
