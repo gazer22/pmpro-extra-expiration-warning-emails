@@ -3,7 +3,7 @@ Contributors: strangerstudios
 Tags: pmpro, paid memberships pro, members, expiration, email, member communication
 Requires at least: 5.2
 Tested up to: 6.8
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 
 Send more than one customized "membership expiration warning" email to users with PMPro.
 
